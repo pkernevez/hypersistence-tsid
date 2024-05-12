@@ -959,12 +959,25 @@ public final class TSID implements Serializable, Comparable<TSID> {
 		 */
 		public TSID generate() {
 
-			final long _time = getTime() << RANDOM_BITS;
+			final Info _info = getTime();
+			final long _time = _info.time << RANDOM_BITS;
 			final long _node = (long) this.node << this.counterBits;
 			final long _counter = (long) this.counter & this.counterMask;
-
-			return new TSID(_time | _node | _counter);
+			TSID result = new TSID(_time | _node | _counter);
+            _info.str.append(" | AFTER, time=").append(_time).append(", counter=").append(this.counter).append(", TSID=").append(result);
+            System.out.println(_info.str);
+            return result;
 		}
+
+        private static class Info{
+            private final long time;
+            private final StringBuilder str;
+
+            private Info(long time, StringBuilder str) {
+                this.time = time;
+                this.str = str;
+            }
+        }
 
 		/**
 		 * Returns the current time.
@@ -978,27 +991,33 @@ public final class TSID implements Serializable, Comparable<TSID> {
 		 *
 		 * @return the current time
 		 */
-		private synchronized long getTime() {
-
+		private synchronized Info getTime() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Thread=").append(Thread.currentThread().getName());
 			long time = clock.millis();
-
+            sb.append(", clock=").append(time);
+            sb.append(", lastTime=").append(this.lastTime);
 			if (time <= this.lastTime) {
+                sb.append(", counterBefore=").append(this.counter);
 				this.counter++;
 				// Carry is 1 if an overflow occurs after ++.
 				int carry = this.counter >>> this.counterBits;
 				this.counter = this.counter & this.counterMask;
+                sb.append(", carry=").append(carry);
 				time = this.lastTime + carry; // increment time
 			} else {
 				// If the system clock has advanced as expected,
 				// simply reset the counter to a new random value.
 				this.counter = this.getRandomValue();
 			}
+            sb.append(", counterNew=").append(counter);
 
 			// save current time
 			this.lastTime = time;
 
+            sb.append(", newTime=").append(this.lastTime);
 			// adjust to the custom epoch
-			return time - this.customEpoch;
+			return new Info( time - this.customEpoch, sb);
 		}
 
 		/**
